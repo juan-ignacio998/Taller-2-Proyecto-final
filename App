@@ -1,0 +1,37 @@
+import streamlit as st
+from transformers import pipeline
+
+# 1. Configuración de la página
+st.set_page_config(page_title="Strata Sentiment Analysis", page_icon="🚀")
+
+st.title("Clasificador de Reseñas - Proyecto Strata 📊")
+st.write(
+    "Ingresá una reseña en inglés y la IA (Hugging Face) va a detectar si el sentimiento es positivo o negativo. ¡Intentá engañarla con sarcasmo!")
+
+
+# 2. Guardamos el modelo en caché para que no lo cargue de cero en cada clic
+@st.cache_resource
+def cargar_modelo():
+    return pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english", truncation=True)
+
+
+clasificador = cargar_modelo()
+
+# 3. Interfaz del usuario
+texto_usuario = st.text_area("Escribí tu reseña acá:")
+
+if st.button("Analizar Sentimiento 🧠"):
+    if texto_usuario.strip() != "":
+        # Hacemos la predicción
+        resultado = clasificador(texto_usuario)[0]
+        etiqueta = resultado['label']
+        confianza = resultado['score']
+
+        # Mostramos el resultado con colores
+        if etiqueta == 'POSITIVE':
+            st.success(f"Resultado: **POSITIVO** 🟢 (Confianza: {confianza:.2%})")
+        else:
+            st.error(f"Resultado: **NEGATIVO** 🔴 (Confianza: {confianza:.2%})")
+    else:
+        st.warning("¡Che, tenés que escribir algo antes de darle al botón!")
+        
