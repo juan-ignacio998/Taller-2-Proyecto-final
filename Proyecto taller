@@ -1,0 +1,175 @@
+import pandas as pd
+import re
+import nltk
+import os
+import kagglehub
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
+from nltk.tokenize import word_tokenize
+
+# 1. Descarga de recursos y dataset
+nltk.download('punkt')
+nltk.download('stopwords')
+nltk.download('wordnet')
+path = kagglehub.dataset_download("jerassy/trustpilot-reviews-123k")
+print("Ruta de descarga de Kaggle:", path)
+
+# 2. Carga del CSV dinámico
+archivos_csv = [f for f in os.listdir(path) if f.endswith('.csv')]
+ruta_completa = os.path.join(path, archivos_csv[0])
+df = pd.read_csv(ruta_completa)
+
+# 3. Limpieza de nulos y armado de Target
+df = df.dropna(subset=['review', 'stars'])
+df = df[df['stars'] != 3].copy()
+df['sentiment'] = df['stars'].apply(lambda x: 1 if x > 3 else 0)
+
+# 4. Configuración de NLTK
+stop_words = set(stopwords.words('english'))
+lemmatizer = WordNetLemmatizer()
+
+def preprocesar_texto(texto):
+    if not isinstance(texto, str):
+        return ""
+    texto = texto.lower()
+    texto = re.sub(r'[^a-z\s]', '', texto)
+    tokens = word_tokenize(texto)
+    tokens_limpios = [lemmatizer.lemmatize(palabra) for palabra in tokens if palabra not in stop_words]
+    return ' '.join(tokens_limpios)
+
+# 5. Aplicar preprocesamiento
+df['clean_review'] = df['review'].apply(preprocesar_texto)
+df = df[['clean_review', 'sentiment']]
+
+print(df.head())
+print("Total de reseñas listas:", len(df))
+
+
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+
+# 1. Vectorización BoW
+vectorizer_bow = CountVectorizer()
+X_bow = vectorizer_bow.fit_transform(df['clean_review'])
+print("Tamaño vocabulario BoW:", len(vectorizer_bow.vocabulary_))
+
+# 2. Vectorización TF-IDF (Unigramas)
+vectorizer_tfidf_uni = TfidfVectorizer(ngram_range=(1, 1))
+X_tfidf_uni = vectorizer_tfidf_uni.fit_transform(df['clean_review'])
+print("Tamaño vocabulario TF-IDF Unigrama:", len(vectorizer_tfidf_uni.vocabulary_))
+
+# 3. Vectorización TF-IDF (Bigramas)
+vectorizer_tfidf_bi = TfidfVectorizer(ngram_range=(2, 2))
+X_tfidf_bi = vectorizer_tfidf_bi.fit_transform(df['clean_review'])
+print("Tamaño vocabulario TF-IDF Bigrama:", len(vectorizer_tfidf_bi.vocabulary_))
+
+import gensim.downloader as api
+import numpy as np
+
+# 1. Descargar modelo de embeddings pre-entrenado
+print("Descargando vectores pre-entrenados...")
+modelo_embeddings = api.load("glove-wiki-gigaword-100")
+
+
+# 2. Función para convertir una reseña entera en un solo vector promediando sus palabras
+def vector_documento(modelo, texto):
+    # Agarramos solo las palabras que existen en el vocabulario del modelo pre-entrenado
+    palabras_validas = [palabra for palabra in texto.split() if palabra in modelo.key_to_index]
+
+    # Si la reseña se quedó vacía, devolvemos un vector de ceros
+    if not palabras_validas:
+        return np.zeros(modelo.vector_size)
+
+    # Promediamos los vectores de todas las palabras de la reseña
+    return np.mean(modelo[palabras_validas], axis=0)
+
+
+# 3. Aplicamos la función a todas las reseñas limpias
+print("Transformando textos a embeddings...")
+X_embeddings = df['clean_review'].apply(lambda x: vector_documento(modelo_embeddings, x))
+
+# 4. Convertimos la lista de vectores en una matriz lista para entrenar
+X_embeddings_matrix = np.vstack(X_embeddings)
+
+print("Forma de la matriz de embeddings:", X_embeddings_matrix.shape)
+
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
+
+# 1. División de datos (80% entrenamiento, 20% prueba)
+X_train, X_test, y_train, y_test = train_test_split(
+    X_tfidf_uni, df['sentiment'], test_size=0.2, random_state=42, stratify=df['sentiment']
+)
+
+# 2. Configuración del modelo y Grid Search
+modelo_logreg = LogisticRegression(max_iter=1000)
+parametros = {'C': [0.1, 1, 10]} # Probamos distintas fuerzas de regularización
+
+# n_jobs=-1 usa todos los núcleos disponibles para paralelizar
+grid_search = GridSearchCV(modelo_logreg, parametros, cv=3, scoring='f1_macro', n_jobs=-1)
+
+# 3. Entrenamiento
+print("Entrenando Regresión Logística con Grid Search...")
+grid_search.fit(X_train, y_train)
+
+# 4. Predicciones con el mejor modelo encontrado
+mejor_modelo = grid_search.best_estimator_
+y_pred = mejor_modelo.predict(X_test)
+
+# 5. Cálculo de métricas
+print(f"\nMejor parámetro C: {grid_search.best_params_['C']}")
+print(f"Accuracy: {accuracy_score(y_test, y_pred):.4f}")
+print(f"Precision: {precision_score(y_test, y_pred):.4f}")
+print(f"Recall: {recall_score(y_test, y_pred):.4f}")
+print(f"F1 Macro: {f1_score(y_test, y_pred, average='macro'):.4f}")
+print("\nMatriz de Confusión:")
+print(confusion_matrix(y_test, y_pred))
+
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, confusion_matrix
+
+# 1. Armamos el banco de oraciones adversariales simulado
+data_adv = {
+    'review_trampa': [
+        "I wouldn't say this product is excellent.",
+        "Amazing is definitely not a word I would use for this service.",
+        "The whole purchase experience was completely unsatisfactory."
+    ],
+    'sentiment_real': [0, 0, 0] # Etiquetas reales (todas negativas)
+}
+df_adv = pd.DataFrame(data_adv)
+
+# 2. Limpiamos y vectorizamos los textos trampa
+df_adv['clean_review'] = df_adv['review_trampa'].apply(preprocesar_texto)
+X_adv_tfidf = vectorizer_tfidf_uni.transform(df_adv['clean_review'])
+
+# 3. Entrenamos el Random Forest con los datos originales
+modelo_rf = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
+modelo_rf.fit(X_train, y_train)
+
+# 4. Hacemos las inferencias sobre el dataset adversarial
+y_pred_adv_rf = modelo_rf.predict(X_adv_tfidf)
+
+# 5. Calculamos las métricas
+print(f"Accuracy RF: {accuracy_score(df_adv['sentiment_real'], y_pred_adv_rf):.4f}")
+print("\nMatriz de Confusión RF:")
+print(confusion_matrix(df_adv['sentiment_real'], y_pred_adv_rf))
+
+from transformers import pipeline
+
+# 1. Instanciamos el clasificador (esto es lo que te faltaba)
+clasificador = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english", truncation=True)
+
+# 2. Agarramos los textos originales (sin limpiar) del dataset adversarial
+textos_adv_crudos = df_adv['review_trampa'].tolist()
+
+# 3. Generamos las predicciones
+print("Evaluando frases trampa con Hugging Face...")
+resultados_hf_adv = clasificador(textos_adv_crudos)
+
+# 4. Imprimimos los resultados
+print("\nResultados Hugging Face vs Banco Adversarial:")
+for texto, resultado in zip(textos_adv_crudos, resultados_hf_adv):
+    print(f"[{resultado['label']}] (Confianza: {resultado['score']:.4f}) -> {texto}")
+
