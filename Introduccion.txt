@@ -1,4 +1,0 @@
-1. Introducción
-Analizar manualmente miles de reseñas online para entender qué opinan los clientes es un proceso lento y poco escalable. El problema a resolver en este trabajo es cómo automatizar la interpretación del texto para extraer y clasificar de forma eficiente el sentimiento de los usuarios.
-
-El objetivo principal de este proyecto es construir un pipeline completo de Machine Learning para análisis de sentimiento. El proceso abarca desde la preparación de los datos y la prueba de distintas representaciones (BoW, TF-IDF, embeddings y Hugging Face), hasta el entrenamiento y evaluación de distintos modelos. La meta final es elegir el mejor clasificador, validando su robustez frente a un banco de oraciones complejas o adversariales, y desplegarlo en una aplicación web

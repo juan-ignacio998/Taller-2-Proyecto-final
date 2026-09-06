@@ -1,0 +1,43 @@
+Informe Integrador Taller II - Ing. en IA
+Grupo:
+Juan Ignacio Cordero
+Matias Leonel Sanchez
+Ignacio Fernandez Cano
+Patricio Cancellieri
+
+1. Introducción El presente proyecto tiene como objetivo desarrollar un pipeline de Procesamiento de Lenguaje Natural (NLP) capaz de clasificar de manera automatizada el sentimiento de reseñas de usuarios para el cliente Strata. El problema central radica en la necesidad de extraer valor de grandes volúmenes de texto no estructurado. Para resolverlo, se evaluaron y compararon distintos enfoques de representación numérica de texto y modelos de clasificación, buscando el equilibrio óptimo entre eficiencia computacional y comprensión del contexto semántico.
+
+2. Dataset: La fuente de los datos utilizados para entrenar y validar los modelos proviene de la plataforma Trustpilot. Se seleccionó un conjunto de datos generalista que abarca reseñas de 1.680 empresas diferentes, lo que permite entrenar un modelo robusto capaz de identificar la polaridad del lenguaje sin sesgarse hacia un nicho de mercado específico. Tras la depuración inicial, la cantidad de reseñas operativas quedó conformada por 101.917 textos. 
+●	Variables principales: El texto original de la opinión, el texto preprocesado y la etiqueta objetivo de sentimiento.
+●	Etiquetado: Se implementó una clasificación binaria. Las reseñas se dividieron en positivas y negativas, descartando previamente las opiniones neutrales de 3 estrellas para evitar ambigüedades durante el aprendizaje estadístico.
+
+3. Preprocesamiento Para que los modelos pudieran procesar el texto sin ruido y reducir la cantidad de datos innecesarios, se aplicó un pipeline de limpieza con la librería NLTK sobre las reseñas originales:
+●	Limpieza y normalización: Se pasó todo el texto a minúsculas y se eliminaron números, signos de puntuación y caracteres especiales con expresiones regulares. Esto evita que el modelo trate palabras idénticas como distintas solo por llevar una mayúscula o una coma pegada.
+●	Tokenización y Lematización: Se separaron las oraciones en palabras sueltas (tokens) y se utilizó WordNetLemmatizer para llevar cada término a su raíz morfológica básica (por ejemplo, transformando verbos conjugados o plurales a su forma base).
+●	Filtrado de stopwords: Se quitaron las palabras vacías más comunes del inglés mediante la lista por defecto de NLTK. Si bien esto achica mucho el vocabulario y acelera el entrenamiento, tuvo un costo importante: al borrar términos como "not" o "wouldn't", los modelos clásicos perdieron la noción de negación, algo que más adelante quedó en evidencia durante las pruebas con las frases trampa.
+
+4. Representación del texto Para que los algoritmos puedan procesar las reseñas, transformamos el texto limpio en valores numéricos usando distintos enfoques:
+●	Bag of Words (BoW) y TF-IDF: Utilizamos el conteo básico de frecuencias y luego aplicamos TF-IDF (tanto en unigramas como en bigramas) para darle más peso a los términos relevantes y penalizar aquellas palabras que aparecen en casi todas las oraciones.
+●	Embeddings Pre-entrenados: Implementamos el modelo “glove-wiki-gigaword-100”. En vez de simplemente contar palabras, promediamos los vectores de cada término para representar toda la reseña en un único vector denso de 100 dimensiones, logrando capturar mucho mejor el significado semántico general.
+
+5. Modelos probados Decidimos entrenar dos enfoques clásicos de Machine Learning para comparar su desempeño:
+●	Regresión Logística: Un modelo lineal rápido y muy eficiente, ideal para procesar las matrices gigantes y dispersas (con muchos ceros) que genera TF-IDF.
+●	Random Forest: Un algoritmo robusto basado en múltiples árboles de decisión, elegido para intentar capturar relaciones más complejas y no lineales en el vocabulario de los usuarios.
+
+6. Optimización Para encontrar la mejor configuración de la Regresión Logística, utilizamos Grid Search con validación cruzada de 3 pliegues (CV=3). Evaluamos distintas fuerzas de regularización ajustando el hiperparámetro C (0.1, 1 y 10), priorizando la métrica F1-Macro y aprovechando todos los hilos del procesador (n_jobs=-1) para acelerar el entrenamiento.
+
+7. Resultados La evaluación de los modelos exigió el cálculo de métricas (accuracy, precision, recall, F1 y matriz de confusión). Se dividió en dos fases: el rendimiento general sobre el conjunto de prueba y una prueba de estrés utilizando el banco de oraciones adversariales.
+Rendimiento General (Regresión Logística con TF-IDF): El modelo lineal logró un desempeño sólido para procesar el conjunto de reseñas estándar:
+●	Accuracy: 0.8988
+●	Precision: 0.9116
+●	Recall: 0.9109
+●	F1 Macro: 0.8967
+●	Matriz de Confusión: Verdaderos Negativos (7724), Falsos Positivos (1027), Falsos Negativos (1036), Verdaderos Positivos (10597).
+Rendimiento en Banco Adversarial: Al enfrentar las frases trampa elaboradas, los modelos expusieron sus debilidades.
+●	Random Forest (TF-IDF): Obtuvo un Accuracy de 0.0000. Su matriz de confusión [[0, 3], [0, 0]] indica que predijo las 3 reseñas tramposas (que eran negativas) erróneamente como positivas.
+●	Hugging Face (DistilBERT): Logró identificar correctamente el sentimiento en 2 de las 3 oraciones, detectando exitosamente la negación estructural ("I wouldn't say this product is excellent" -> negativo) y la insatisfacción general ("...completely unsatisfactory" -> negativo). Sin embargo, falló en la segunda frase clasificándola como positiva con un 98.54% de confianza.
+
+8. Análisis e interpretación Los resultados sobre el test set adversarial exponen perfectamente el impacto del preprocesamiento en el desempeño por clase. El Random Forest clásico fracasó rotundamente porque el filtrado de stopwords eliminó las partículas negativas, dejando en los vectores únicamente palabras relevantes engañosas como "excellent" o "amazing". Al perder esa inversión sintáctica, el algoritmo clasificó las quejas como positivas.
+Por otro lado, el pipeline de Hugging Face retuvo la semántica completa. No obstante, el falso positivo en la frase "Amazing is definitely not a word I would use" demuestra que, aunque los embeddings pre-entrenados y Transformers entienden negaciones simples, siguen siendo vulnerables ante inversiones complejas o irónicas donde el peso estadístico de la palabra inicial ("Amazing") nubla la predicción final de la red.
+
+9. Conclusiones Para el despliegue final en la aplicación web, elegimos implementar el modelo de Hugging Face (Transformers). Aunque computacionalmente es más exigente que los algoritmos clásicos, su capacidad para entender el contexto real y las negaciones lo hace inmensamente superior para el análisis de sentimientos. Como mejora a futuro, proponemos realizar un proceso de fine-tuning sobre un modelo de lenguaje más ligero para agilizar los tiempos de respuesta en producción sin perder precisión
