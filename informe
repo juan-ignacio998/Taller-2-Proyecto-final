@@ -1,11 +1,12 @@
 Informe Integrador Taller II - Ing. en IA
-Grupo:
-Juan Ignacio Cordero
-Matias Leonel Sanchez
-Ignacio Fernandez Cano
-Patricio Cancellieri
 
-1. Introducción El presente proyecto tiene como objetivo desarrollar un pipeline de Procesamiento de Lenguaje Natural (NLP) capaz de clasificar de manera automatizada el 
+Integrantes del Grupo:
+
+. Patricio Cancellieri
+. Juan Ignacio Cordero
+. Matias Leonel Sanchez
+
+1. Introducción: El presente proyecto tiene como objetivo desarrollar un pipeline de Procesamiento de Lenguaje Natural (NLP) capaz de clasificar de manera automatizada el 
 sentimiento de reseñas de usuarios para el cliente Strata. El problema central radica en la necesidad de extraer valor de grandes volúmenes de texto no estructurado.
 Para resolverlo, se evaluaron y compararon distintos enfoques de representación numérica de texto y modelos de clasificación, buscando el equilibrio óptimo entre eficiencia 
 computacional y comprensión del contexto semántico.
