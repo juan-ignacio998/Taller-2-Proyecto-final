@@ -26,7 +26,7 @@ que el modelo trate palabras idénticas como distintas solo por llevar una mayú
 ●	Tokenización y Lematización: Se separaron las oraciones en palabras sueltas (tokens) y se utilizó WordNetLemmatizer para llevar cada término a su raíz morfológica básica
 (por ejemplo, transformando verbos conjugados o plurales a su forma base).
 ●	Filtrado de stopwords: Se quitaron las palabras vacías más comunes del inglés mediante la lista por defecto de NLTK. Si bien esto achica mucho el vocabulario y acelera el
-entrenamiento, tuvo un costo importante: al borrar términos como "not" o "wouldn't", los modelos clásicos perdieron la noción de negación, algo que más adelante quedó en
+entrenamiento, tuvo un costo importante: al borrar términos como "not" , los modelos clásicos perdieron la noción de negación, algo que más adelante quedó en
 evidencia durante las pruebas con las frases trampa.
 
 4. Representación del texto Para que los algoritmos puedan procesar las reseñas, transformamos el texto limpio en valores numéricos usando distintos enfoques:
